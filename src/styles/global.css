@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+/* Self-hosted fonts (offline-first — the shop PC has no internet, so no
+   Google Fonts CDN). Poppins = logo wordmark + headings (geometric sans,
+   friendly + modern, fits the paper-plane brand). Inter = UI/body text
+   (the standard for app interfaces). Latin subsets only. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/poppins-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/poppins-700.woff2') format('woff2');
+}
+
+/* Tailwind v4 is CSS-first: it IGNORES tailwind.config.js unless the CSS
+   points at it. The old setup defined primary/muted/card colours only in
+   that JS config, so v4 generated NO bg-primary / text-primary /
+   border-primary utilities at all — every primary button rendered with a
+   transparent background and looked like plain text. This @theme block is
+   the fix: it maps the :root variables below to real theme colours. */
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-elevation: 0 4px 16px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-floating: 0 20px 40px -10px rgba(0, 0, 0, 0.12), 0 8px 16px -4px rgba(0, 0, 0, 0.06);
+
+  /* Typography: Inter for UI/body, Poppins for the logo wordmark + headings */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 240 5% 98%;
+    --foreground: 240 6% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
+
+    --primary: 212 100% 48%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 212 100% 43%;
+
+    /* Button contrast rule (user): a button's background must NEVER match
+       the surface it sits on. Old --secondary was 240 5% 95% — almost the
+       same as the white card (100%) and page bg (98%), so secondary buttons
+       looked like plain text. New secondary is a clear light-blue tint;
+       muted is a visibly darker grey. */
+    --secondary: 212 45% 87%;
+    --secondary-foreground: 240 6% 15%;
+
+    --muted: 240 5% 88%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 212 85% 92%;
+    --accent-foreground: 212 100% 45%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 212 100% 48%;
+  }
+
+  .dark {
+    --background: 240 6% 7%;
+    --foreground: 0 0% 96%;
+
+    --card: 240 5% 10%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 240 5% 10%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 212 100% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 212 100% 60%;
+
+    /* Dark mode: secondary/muted must also stand out from the card (10%)
+       and page bg (7%) — old 15%/16% was barely visible. */
+    --secondary: 240 4% 22%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 240 4% 22%;
+    --muted-foreground: 240 4% 60%;
+
+    --accent: 212 45% 22%;
+    --accent-foreground: 212 100% 70%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 212 100% 55%;
+  }
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   Custom Engineered Precision Scrollbars (Dark & Light)
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 150, 0.25);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 150, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(220, 220, 230, 0.18);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 220, 230, 0.35);
+}
+
+/* Tabular figures for pricing numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Real DOCX preview content (mammoth HTML) */
+.docx-preview h1,
+.docx-preview h2,
+.docx-preview h3 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0.4em 0 0.3em;
+}
+.docx-preview h1 { font-size: 15px; }
+.docx-preview h2 { font-size: 13px; }
+.docx-preview h3 { font-size: 12px; }
+.docx-preview p { margin: 0.35em 0; }
+.docx-preview ul,
+.docx-preview ol { padding-left: 1.2em; margin: 0.35em 0; }
+.docx-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  font-size: 10px;
+}
+.docx-preview td,
+.docx-preview th {
+  border: 1px solid #d4d4d8;
+  padding: 3px 5px;
+  text-align: left;
+}
+
+/* Clean backdrop blur utility without eye strain */
+.modal-overlay {
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
