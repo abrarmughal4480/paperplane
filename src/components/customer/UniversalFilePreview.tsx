@@ -20,9 +20,15 @@ import { extractDocxContent, type DocxContent } from '../../utils/docxRenderer';
 interface UniversalFilePreviewProps {
   document: DocumentInfo;
   className?: string;
+  // Multi-file navigation: arrows sit on the preview card itself so
+  // switching files needs no scrolling. Only shown when provided.
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
 }
 
-export function UniversalFilePreview({ document, className = '' }: UniversalFilePreviewProps) {
+export function UniversalFilePreview({ document, className = '', onPrev, onNext, hasPrev, hasNext }: UniversalFilePreviewProps) {
   const category: FileCategory = document.category || getFileCategory(document.fileName, document.fileType);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [activePage, setActivePage] = useState<number>(1);
@@ -207,6 +213,30 @@ export function UniversalFilePreview({ document, className = '' }: UniversalFile
           </button>
         </div>
       </div>
+
+      {/* Left / Right file arrows (multi-file only) */}
+      {onPrev && hasPrev && (
+        <button
+          type="button"
+          onClick={onPrev}
+          aria-label="Previous file"
+          title="Previous file"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-card/95 backdrop-blur-md border border-border shadow-elevation text-foreground flex items-center justify-center hover:bg-muted active:scale-95 transition-all cursor-pointer"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      )}
+      {onNext && hasNext && (
+        <button
+          type="button"
+          onClick={onNext}
+          aria-label="Next file"
+          title="Next file"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-card/95 backdrop-blur-md border border-border shadow-elevation text-foreground flex items-center justify-center hover:bg-muted active:scale-95 transition-all cursor-pointer"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
 
       {/* Main Preview Container */}
       <div className="w-full flex items-center justify-center py-4 my-auto overflow-hidden">

@@ -3,14 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
-  Circle,
   Loader2,
   Package,
   Printer,
   ClipboardList,
-  ShieldCheck,
-  Volume2,
-  ArrowRight,
   RotateCcw,
 } from 'lucide-react';
 import { useCustomerOrder } from '../../context/CustomerOrderContext';
@@ -20,7 +16,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 
-const STEPS = [
+const STEPS = (printerName: string) => [
   {
     status: 'queued' as OrderStatus,
     label: 'Order in Queue',
@@ -30,7 +26,7 @@ const STEPS = [
   {
     status: 'printing' as OrderStatus,
     label: 'Printing in Progress',
-    desc: 'HP LaserJet Pro is spooling your document',
+    desc: `${printerName} is spooling your document`,
     icon: Printer,
   },
   {
@@ -57,6 +53,7 @@ export function StatusPage() {
     resetOrder,
     paperTypes,
     pricingConfig,
+    printerStatus,
   } = useCustomerOrder();
 
   const currentDocs = documents.length > 0 ? documents : (selectedDocument ? [selectedDocument] : []);
@@ -103,6 +100,9 @@ export function StatusPage() {
   const isReady = orderStatus === 'ready';
 
   const currentIdx = ORDER_FLOW.indexOf(orderStatus);
+  const steps = STEPS(
+    printerStatus.status === 'unknown' ? 'The counter printer' : printerStatus.model || printerStatus.name
+  );
 
   return (
     <div className="py-2 space-y-6">
@@ -160,7 +160,7 @@ export function StatusPage() {
       {/* Vertical Animated Progress Tracker */}
       <Card className="p-6 space-y-6 border-border/80 shadow-elevation">
         <div className="space-y-6">
-          {STEPS.map((st, idx) => {
+          {steps.map((st, idx) => {
             const isCompleted = currentIdx > idx;
             const isCurrent = currentIdx === idx;
             const isUpcoming = currentIdx < idx;
@@ -169,7 +169,7 @@ export function StatusPage() {
             return (
               <div key={st.status} className="flex gap-4 relative">
                 {/* Connecting Line */}
-                {idx < STEPS.length - 1 && (
+                {idx < steps.length - 1 && (
                   <div
                     className={`absolute left-[19px] top-10 bottom-[-24px] w-0.5 transition-colors duration-300 ${
                       currentIdx > idx ? 'bg-primary' : 'bg-muted'
@@ -251,32 +251,6 @@ export function StatusPage() {
           <span className="text-primary tabular-nums">{formatPrice(totalAmount)}</span>
         </div>
       </Card>
-
-      {/* Simulation Controller */}
-      <div className="p-3 rounded-xl bg-muted/40 border border-border/60 space-y-2 text-xs">
-        <div className="flex items-center justify-between text-muted-foreground font-semibold text-[11px]">
-          <span>Queue Status Simulation</span>
-          <span className="font-mono text-[10px] opacity-75">Demo Mode</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {(['queued', 'printing', 'ready'] as OrderStatus[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setOrderStatus(s)}
-              className={`py-1.5 px-2 rounded-lg font-semibold text-xs capitalize transition-all cursor-pointer ${
-                orderStatus === s
-                  ? s === 'ready'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-primary text-white shadow-sm'
-                  : 'bg-card border border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {s === 'ready' ? 'Ready' : s}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Start New Order */}
       <div className="text-center pt-2">

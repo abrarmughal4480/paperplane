@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -16,7 +16,6 @@ import {
 } from '../../utils/pricing';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 
 export function ConfirmPage() {
   const navigate = useNavigate();
@@ -32,6 +31,8 @@ export function ConfirmPage() {
 
   const currentDocs = documents.length > 0 ? documents : (selectedDocument ? [selectedDocument] : []);
   const isMulti = currentDocs.length > 1;
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (currentDocs.length === 0) {
@@ -56,8 +57,17 @@ export function ConfirmPage() {
     paperTypes
   );
 
-  const handleConfirm = () => {
-    submitOrder();
+  const handleConfirm = async () => {
+    setSubmitError(null);
+    setIsSubmitting(true);
+    const token = await submitOrder();
+    setIsSubmitting(false);
+    if (!token) {
+      setSubmitError(
+        'Order could not reach the counter — check the shop Wi-Fi connection and try again. Your files are still staged here, nothing was lost.'
+      );
+      return;
+    }
     navigate('/customer/token');
   };
 
@@ -97,10 +107,9 @@ export function ConfirmPage() {
               <p className="text-xs font-bold text-foreground">
                 {isMulti ? `Print Order Bundle (${currentDocs.length} Files)` : 'Print Order Summary'}
               </p>
-              <p className="text-[10px] text-muted-foreground">Verified & ready to print</p>
+              <p className="text-[10px] text-muted-foreground">{shopConfig.name}</p>
             </div>
           </div>
-          <Badge variant="outline">Verified</Badge>
         </div>
 
         {/* Multi-document detailed receipt rows */}
@@ -220,14 +229,20 @@ export function ConfirmPage() {
 
       {/* Confirmation Actions */}
       <div className="space-y-3">
+        {submitError && (
+          <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+            {submitError}
+          </div>
+        )}
         <Button
           variant="primary"
           size="lg"
           fullWidth
           onClick={handleConfirm}
+          isLoading={isSubmitting}
           className="gap-2 shadow-elevation py-6 text-base font-bold"
         >
-          <span>Confirm & Generate Token</span>
+          <span>{isSubmitting ? 'Sending to Counter…' : 'Confirm & Generate Token'}</span>
           <ArrowRight className="w-4 h-4" />
         </Button>
 

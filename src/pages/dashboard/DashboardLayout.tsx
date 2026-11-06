@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   ListOrdered,
@@ -15,23 +15,22 @@ import {
   ShieldCheck,
   Smartphone,
   ChevronRight,
-  ExternalLink,
   Copy,
   Check,
 } from 'lucide-react';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { cn } from '../../utils/cn';
-import { mockDailyStats } from '../../data/mockData';
 import { useCustomerOrder } from '../../context/CustomerOrderContext';
 import { Modal } from '../../components/ui/Modal';
+import { QrPrintSheet } from '../../components/dashboard/QrPrintSheet';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Overview', end: true },
-  { to: '/dashboard/queue', icon: ListOrdered, label: 'Print Queue', end: false, badge: '5' },
+  { to: '/dashboard/queue', icon: ListOrdered, label: 'Print Queue', end: false },
   { to: '/dashboard/pricing', icon: DollarSign, label: 'Pricing Matrix', end: false },
   { to: '/dashboard/orders', icon: FileStack, label: 'Order Archive', end: false },
   { to: '/dashboard/reports', icon: BarChart3, label: 'Analytics', end: false },
-  { to: '/dashboard/printer', icon: Printer, label: 'Printers', end: false, dot: true },
+  { to: '/dashboard/printer', icon: Printer, label: 'Printers', end: false },
   { to: '/dashboard/settings', icon: Settings, label: 'Shop Settings', end: false },
 ];
 
@@ -49,9 +48,11 @@ export default function DashboardLayout() {
   const location = useLocation();
   // Navbar is dynamic: shop name + live queue count come from the store
   // (Dashboard → Shop Settings edits the name; the queue badge counts
-  // real queued orders instead of a hardcoded "5").
-  const { shopConfig, orders } = useCustomerOrder();
+  // real queued orders instead of a hardcoded number).
+  const { shopConfig, orders, printers } = useCustomerOrder();
   const queuedCount = orders.filter((o) => o.status === 'queued').length;
+  // Green dot on Printers only when a real printer is actually online.
+  const printerOnline = printers.length > 0 && printers[0].status === 'online';
 
   useEffect(() => {
     fetch('/api/network-info')
@@ -93,13 +94,6 @@ export default function DashboardLayout() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Link
-            to="/customer/upload"
-            className="p-1.5 rounded-lg text-primary bg-primary/10 hover:bg-primary/20"
-            title="Customer View"
-          >
-            <QrCode className="w-4 h-4" />
-          </Link>
         </div>
       </div>
 
@@ -127,7 +121,7 @@ export default function DashboardLayout() {
               className="w-9 h-9 rounded-xl shadow-subtle object-cover bg-white"
             />
             <div>
-              <div className="text-sm font-bold tracking-tight font-display">PaperPlane POS</div>
+              <div className="text-sm font-bold tracking-tight font-display">PaperPlane</div>
               <div className="text-[11px] text-muted-foreground truncate max-w-[130px]">
                 {shopConfig.name}
               </div>
@@ -191,36 +185,21 @@ export default function DashboardLayout() {
                     <span>{item.label}</span>
                   </div>
 
-                  {item.to === '/dashboard/queue' ? (
-                    queuedCount > 0 && (
-                      <span
-                        className={cn(
-                          'text-[10px] px-1.5 py-0.5 rounded-full font-bold tabular-nums',
-                          isActive
-                            ? 'bg-white/20 text-white'
-                            : 'bg-primary/10 text-primary'
-                        )}
-                      >
-                        {queuedCount}
-                      </span>
-                    )
-                  ) : (
-                    item.badge && (
-                      <span
-                        className={cn(
-                          'text-[10px] px-1.5 py-0.5 rounded-full font-bold tabular-nums',
-                          isActive
-                            ? 'bg-white/20 text-white'
-                            : 'bg-primary/10 text-primary'
-                        )}
-                      >
-                        {item.badge}
-                      </span>
-                    )
+                  {item.to === '/dashboard/queue' && queuedCount > 0 && (
+                    <span
+                      className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded-full font-bold tabular-nums',
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : 'bg-primary/10 text-primary'
+                      )}
+                    >
+                      {queuedCount}
+                    </span>
                   )}
 
-                  {item.dot && (
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  {item.to === '/dashboard/printer' && printerOnline && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Printer online" />
                   )}
                 </>
               )}
@@ -236,7 +215,7 @@ export default function DashboardLayout() {
             <ThemeToggle />
           </div>
 
-          {/* Shop Status & Switcher Link */}
+          {/* Shop Status */}
           <div className="p-2.5 rounded-xl bg-card border border-border/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -250,15 +229,6 @@ export default function DashboardLayout() {
                 </p>
               </div>
             </div>
-
-            <Link
-              to="/customer/upload"
-              target="_blank"
-              className="p-1 rounded-md text-primary hover:bg-primary/10 transition-colors"
-              title="Open Customer QR Page in New Tab"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </div>
       </aside>
@@ -290,21 +260,12 @@ export default function DashboardLayout() {
             <button
               type="button"
               onClick={() => window.print()}
-              className="py-2.5 px-3.5 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              title="Print standee for counter"
+              className="py-2.5 px-3.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              title="Print a QR sheet you can paste anywhere on the counter"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Standee</span>
+              <span>Print QR</span>
             </button>
-
-            <Link
-              to="/customer/upload"
-              target="_blank"
-              className="py-2.5 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 text-center flex items-center justify-center gap-1.5 shadow-xs"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Test</span>
-            </Link>
           </div>
         }
       >
@@ -341,13 +302,17 @@ export default function DashboardLayout() {
                   Direct Mobile Link
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
-                  Wi-Fi Active
+                  Local Network
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-mono font-bold text-primary break-all">
-                  {networkInfo?.customerUrl || `http://${networkInfo?.lanIp || '10.116.63.104'}:${networkInfo?.port || 5000}/customer/upload`}
-                </p>
+                {networkInfo?.customerUrl ? (
+                  <p className="text-xs font-mono font-bold text-primary break-all">
+                    {networkInfo.customerUrl}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Loading local address…</p>
+                )}
                 <button
                   type="button"
                   onClick={handleCopyLink}
@@ -377,6 +342,13 @@ export default function DashboardLayout() {
           </div>
         </div>
       </Modal>
+
+      {/* Print-only QR sheet (off-screen until printing) */}
+      <QrPrintSheet
+        shopName={shopConfig.name}
+        qrCodeDataUrl={networkInfo?.qrCodeDataUrl ?? null}
+        customerUrl={networkInfo?.customerUrl ?? null}
+      />
     </div>
   );
 }

@@ -4,17 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
   ArrowRight,
-  RefreshCw,
-  Layers,
-  HardDrive,
-  CheckCircle,
   Plus,
-  ChevronRight,
 } from 'lucide-react';
 import { useCustomerOrder } from '../../context/CustomerOrderContext';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { UniversalFilePreview } from '../../components/customer/UniversalFilePreview';
 import { getFileCategory } from '../../data/mockData';
 
@@ -58,7 +52,11 @@ export function PreviewPage() {
           <ChevronLeft className="w-4 h-4" />
           Back to Upload
         </button>
-        <Badge variant="success">All Files Verified</Badge>
+        {isMulti && (
+          <span className="text-xs font-mono font-bold text-primary">
+            Doc {activeDocIndex + 1} of {currentDocs.length}
+          </span>
+        )}
       </div>
 
       {/* Screen Title */}
@@ -81,7 +79,9 @@ export function PreviewPage() {
             <span>{totalPagesSum} Pages Combined</span>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none pt-0.5">
+          {/* Extra top/side padding so the active tab's ring and shadow
+              are never clipped when hovering or scrolling the list. */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-2 px-0.5 scrollbar-none">
             {currentDocs.map((doc, idx) => {
               const isActive = idx === activeDocIndex;
               return (
@@ -120,7 +120,13 @@ export function PreviewPage() {
           exit={{ opacity: 0, scale: 0.98 }}
           transition={{ duration: 0.15 }}
         >
-          <UniversalFilePreview document={currentDoc} />
+          <UniversalFilePreview
+            document={currentDoc}
+            onPrev={isMulti ? () => setActiveDocIndex(Math.max(0, activeDocIndex - 1)) : undefined}
+            onNext={isMulti ? () => setActiveDocIndex(Math.min(currentDocs.length - 1, activeDocIndex + 1)) : undefined}
+            hasPrev={isMulti && activeDocIndex > 0}
+            hasNext={isMulti && activeDocIndex < currentDocs.length - 1}
+          />
         </motion.div>
       </AnimatePresence>
 
@@ -149,28 +155,6 @@ export function PreviewPage() {
             </div>
           )}
         </div>
-
-        {/* Multi-doc quick switcher buttons */}
-        {isMulti && (
-          <div className="flex items-center justify-between border-t border-border/50 pt-2 text-xs">
-            <button
-              type="button"
-              disabled={activeDocIndex <= 0}
-              onClick={() => setActiveDocIndex(Math.max(0, activeDocIndex - 1))}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border bg-card font-semibold text-foreground hover:bg-muted disabled:opacity-30 cursor-pointer"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" /> Previous File
-            </button>
-            <button
-              type="button"
-              disabled={activeDocIndex >= currentDocs.length - 1}
-              onClick={() => setActiveDocIndex(Math.min(currentDocs.length - 1, activeDocIndex + 1))}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-primary/40 bg-primary/10 font-semibold text-primary hover:bg-primary/20 disabled:opacity-30 cursor-pointer"
-            >
-              Next File <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
       </Card>
 
       {/* Actions */}

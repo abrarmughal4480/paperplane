@@ -6,13 +6,8 @@ import {
   Printer,
   Package,
   CheckCircle,
-  TrendingUp,
   ArrowRight,
-  Clock,
-  Sparkles,
-  ExternalLink,
 } from 'lucide-react';
-import { defaultPrinter } from '../../data/mockData';
 import { useCustomerOrder } from '../../context/CustomerOrderContext';
 import { formatPrice } from '../../utils/pricing';
 import { Card } from '../../components/ui/Card';
@@ -21,8 +16,9 @@ import { Button } from '../../components/ui/Button';
 
 export default function DashboardHome() {
   const navigate = useNavigate();
-  const { orders, dailyStats } = useCustomerOrder();
+  const { orders, dailyStats, printerStatus, printers } = useCustomerOrder();
   const currentOrders = orders;
+  const printerDetected = printers.length > 0 && printerStatus.status !== 'unknown';
 
   const recentOrders = [...currentOrders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -46,7 +42,7 @@ export default function DashboardHome() {
     {
       label: 'Currently Printing',
       value: (dailyStats?.printing ?? 0).toString(),
-      trend: 'Active on printer',
+      trend: 'In progress now',
       icon: Printer,
       color: 'text-primary bg-primary/10',
     },
@@ -71,14 +67,9 @@ export default function DashboardHome() {
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-              Counter Dashboard
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              POS Live
-            </span>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+            Counter Dashboard
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Real-time file intake, printer queue spooler and daily PKR sales tracking.
           </p>
@@ -215,16 +206,20 @@ export default function DashboardHome() {
           </h2>
 
           <Card className="p-5 space-y-4 border-border/80 shadow-subtle">
-            {/* Printer widget */}
+            {/* Printer widget — real detected printer, or an honest empty state */}
             <div className="flex items-center justify-between pb-3 border-b border-border/60">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <div className={`p-2.5 rounded-xl ${printerDetected ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                   <Printer className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-foreground">{defaultPrinter.model}</h4>
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                    ● Online & Spooling
+                  <h4 className="text-xs font-bold text-foreground">
+                    {printerDetected ? (printerStatus.model || printerStatus.name) : 'No printer detected'}
+                  </h4>
+                  <p className={`text-[10px] font-semibold ${printerDetected ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                    {printerDetected
+                      ? '● Online & Spooling'
+                      : 'Connect a printer to this computer'}
                   </p>
                 </div>
               </div>
@@ -233,46 +228,14 @@ export default function DashboardHome() {
               </Link>
             </div>
 
-            {/* Paper & Toner gauges */}
-            <div className="space-y-3 text-xs">
-              <div>
-                <div className="flex justify-between text-muted-foreground mb-1">
-                  <span>Paper Tray Level</span>
-                  <span className="font-bold text-foreground">{defaultPrinter.paperLevel}%</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-primary h-full rounded-full"
-                    style={{ width: `${defaultPrinter.paperLevel}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-muted-foreground mb-1">
-                  <span>Black Toner Cartridge</span>
-                  <span className="font-bold text-foreground">{defaultPrinter.tonerLevel}%</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-full rounded-full"
-                    style={{ width: `${defaultPrinter.tonerLevel}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Counter QR Link */}
-            <div className="pt-2">
-              <Link
-                to="/customer/upload"
-                target="_blank"
-                className="w-full p-2.5 rounded-xl bg-muted/60 hover:bg-muted text-xs font-semibold text-foreground flex items-center justify-between transition-colors border border-border/60"
-              >
-                <span>Launch Counter Customer WebApp</span>
-                <ExternalLink className="w-3.5 h-3.5 text-primary" />
-              </Link>
-            </div>
+            {/* Levels are only shown when the printer actually reports
+                them — this install never invents a paper/toner number. */}
+            {printerDetected && (
+              <p className="text-[11px] text-muted-foreground">
+                Paper and toner levels are not reported by this printer.
+                Refill and check them on the printer itself.
+              </p>
+            )}
           </Card>
         </div>
       </div>

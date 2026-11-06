@@ -5,7 +5,7 @@
 
 class SSEManager {
   constructor() {
-    // Set of response objects for dashboard POS
+    // Set of response objects for dashboard
     this.dashboardClients = new Set();
     // Map of token -> Set of response objects for customer phones
     this.customerClients = new Map();

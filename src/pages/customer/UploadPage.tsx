@@ -7,7 +7,6 @@ import {
   Info,
   Clock,
   ArrowRight,
-  Shield,
   FileText,
   Image as ImageIcon,
   Table,
@@ -59,7 +58,12 @@ export function UploadPage() {
     removeDocument,
     clearDocuments,
     setActiveDocIndex,
+    orders,
   } = useCustomerOrder();
+
+  // Live queue length — the wait indicator shows real jobs ahead,
+  // never a made-up "ready in 2 minutes".
+  const queuedCount = orders.filter((o) => o.status === 'queued' || o.status === 'printing').length;
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -358,14 +362,8 @@ export function UploadPage() {
         </button>
         <span className="text-muted-foreground flex items-center gap-1">
           <Clock className="w-3.5 h-3.5" />
-          Ready in ~2 mins
+          {queuedCount > 0 ? `${queuedCount} job${queuedCount === 1 ? '' : 's'} ahead in queue` : 'Counter is free — no queue'}
         </span>
-      </div>
-
-      {/* Privacy Notice */}
-      <div className="p-3 rounded-xl bg-muted/40 border border-border/60 flex items-center gap-3 text-xs text-muted-foreground">
-        <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-        <span>Your files are automatically deleted from the server after printing.</span>
       </div>
 
       {/* Rates Modal */}

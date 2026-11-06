@@ -419,7 +419,7 @@ export default function PricingPage() {
               </div>
             </div>
 
-            {/* Simulated Output Card */}
+            {/* Live Price Preview Card */}
             <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between shadow-subtle">
               <div>
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">

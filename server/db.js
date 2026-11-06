@@ -77,16 +77,17 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS shop_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     shop_name TEXT DEFAULT 'Al-Noor Photocopy & Printing',
-    phone TEXT DEFAULT '0300-1234567',
-    address TEXT DEFAULT 'Shop #4, Main Market, Lahore',
+    phone TEXT DEFAULT '',
+    address TEXT DEFAULT '',
     counter_name TEXT DEFAULT 'Counter 1',
-    jazzcash_title TEXT DEFAULT 'Al-Noor Printing',
-    jazzcash_number TEXT DEFAULT '03001234567',
-    easypaisa_title TEXT DEFAULT 'Al-Noor Printing',
-    easypaisa_number TEXT DEFAULT '03451234567',
-    bank_name TEXT DEFAULT 'Meezan Bank Limited',
-    bank_title TEXT DEFAULT 'Al Noor Print Desk',
-    bank_iban TEXT DEFAULT 'PK00MEZN0000001234567890'
+    jazzcash_title TEXT DEFAULT '',
+    jazzcash_number TEXT DEFAULT '',
+    easypaisa_title TEXT DEFAULT '',
+    easypaisa_number TEXT DEFAULT '',
+    bank_name TEXT DEFAULT '',
+    bank_title TEXT DEFAULT '',
+    bank_iban TEXT DEFAULT '',
+    auto_delete_files INTEGER DEFAULT 1
   );
 
   CREATE TABLE IF NOT EXISTS license_sentinel (
@@ -100,6 +101,16 @@ db.exec(`
     status TEXT DEFAULT 'active'
   );
 `);
+
+// Migration for databases created before auto_delete_files existed.
+try {
+  const cols = db.prepare('PRAGMA table_info(shop_settings)').all();
+  if (!cols.some((c) => c.name === 'auto_delete_files')) {
+    db.exec('ALTER TABLE shop_settings ADD COLUMN auto_delete_files INTEGER DEFAULT 1');
+  }
+} catch {
+  // fresh installs already have the column
+}
 
 // Seed Default Paper Types if empty
 const paperCount = db.prepare('SELECT COUNT(*) as count FROM paper_types').get();
@@ -140,7 +151,7 @@ const settingsCount = db.prepare('SELECT COUNT(*) as count FROM shop_settings').
 if (!settingsCount || settingsCount.count === 0) {
   db.prepare(`
     INSERT INTO shop_settings (id, shop_name, phone, address, counter_name, jazzcash_title, jazzcash_number, easypaisa_title, easypaisa_number, bank_name, bank_title, bank_iban)
-    VALUES (1, 'Al-Noor Photocopy & Printing', '0300-1234567', 'Shop #4, Main Market, Lahore', 'Counter 1', 'Al-Noor Printing', '03001234567', 'Al-Noor Printing', '03451234567', 'Meezan Bank Limited', 'Al Noor Print Desk', 'PK00MEZN0000001234567890')
+    VALUES (1, 'Al-Noor Photocopy & Printing', '', '', 'Counter 1', '', '', '', '', '', '', '')
   `).run();
 }
 
@@ -236,6 +247,7 @@ export const dbService = {
   deleteOrder(idOrToken) {
     const order = this.getOrderById(idOrToken);
     if (!order) return false;
+    this.deleteOrderFiles(idOrToken);
     db.prepare('DELETE FROM orders WHERE id = ? OR token = ?').run(idOrToken, idOrToken);
     return true;
   },
@@ -301,7 +313,8 @@ export const dbService = {
         easypaisa_number = ?,
         bank_name = ?,
         bank_title = ?,
-        bank_iban = ?
+        bank_iban = ?,
+        auto_delete_files = ?
       WHERE id = 1
     `).run(
       updated.shop_name,
@@ -314,9 +327,34 @@ export const dbService = {
       updated.easypaisa_number,
       updated.bank_name,
       updated.bank_title,
-      updated.bank_iban
+      updated.bank_iban,
+      updated.auto_delete_files === 0 || updated.auto_delete_files === false ? 0 : 1
     );
     return this.getShopSettings();
+  },
+
+  // Permanently remove an order's uploaded files from disk and clear
+  // their stored names. Called when an order is collected (if auto
+  // delete is on) and when an order is deleted outright — this is
+  // what makes "files are deleted after printing" actually true.
+  deleteOrderFiles(idOrToken) {
+    const order = this.getOrderById(idOrToken);
+    if (!order) return 0;
+    let removed = 0;
+    for (const doc of order.documents || []) {
+      if (!doc.stored_file_name) continue;
+      try {
+        const filePath = path.join(uploadsDir, path.basename(doc.stored_file_name));
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          removed++;
+        }
+      } catch {
+        // keep going; a missing file is already gone
+      }
+    }
+    db.prepare('UPDATE order_documents SET stored_file_name = NULL WHERE order_id = ?').run(order.id);
+    return removed;
   },
 
   // License Sentinel

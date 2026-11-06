@@ -234,3 +234,30 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* QR print sheet: kept off-screen in normal view; when the user prints,
+   everything else is hidden and only this sheet comes out on paper. */
+.qr-print-sheet {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 100%;
+  background: #fff;
+  color: #111;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .qr-print-sheet,
+  .qr-print-sheet * {
+    visibility: visible !important;
+  }
+  .qr-print-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

@@ -22,15 +22,13 @@ import {
   type PrinterStatus,
   type DailyStats,
   type PaperType,
-  mockOrders,
-  mockDocuments,
   defaultPricing,
   defaultShopConfig,
-  defaultPrinter,
+  unknownPrinter,
   defaultPaperTypes,
   getSavedPaperTypes,
   savePaperTypes,
-  generateToken,
+  nextToken,
 } from '../data/mockData';
 import { calculatePrice, calculateMultiDocumentPrice } from '../utils/pricing';
 
@@ -174,9 +172,15 @@ function loadStoredShopConfig(): ShopConfig {
 function loadStoredPrinter(): PrinterStatus {
   try {
     const raw = readStored(STORAGE_KEYS.PRINTER_STATUS);
-    return raw ? { ...defaultPrinter, ...JSON.parse(raw) } : defaultPrinter;
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // Levels are never real in this app (OS detection does not
+      // report them), so any stored number is stale placeholder data.
+      return { ...unknownPrinter, ...saved, paperLevel: null, tonerLevel: null };
+    }
+    return unknownPrinter;
   } catch {
-    return defaultPrinter;
+    return unknownPrinter;
   }
 }
 
@@ -197,6 +201,7 @@ export interface CustomerOrderState {
   pricingConfig: PricingConfig;
   shopConfig: ShopConfig;
   printerStatus: PrinterStatus;
+  printers: PrinterStatus[];
   paperTypes: PaperType[];
   dailyStats: DailyStats;
 }
@@ -213,7 +218,9 @@ export interface CustomerOrderActions {
   setCustomerName: (name: string) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
   setOrderStatus: (status: OrderStatus) => void;
-  submitOrder: (nameOverride?: string) => string;
+  // Resolves to the token, or '' when the order could not be sent
+  // (upload or server failure) — the caller must not show a token then.
+  submitOrder: (nameOverride?: string) => Promise<string>;
   resetOrder: () => void;
   findOrderByToken: (token: string) => Order | undefined;
 
@@ -221,12 +228,11 @@ export interface CustomerOrderActions {
   updatePricingConfig: (partial: Partial<PricingConfig>) => void;
   updateShopConfig: (partial: Partial<ShopConfig>) => void;
   updatePrinterStatus: (partial: Partial<PrinterStatus>) => void;
+  refreshPrinters: () => Promise<void>;
   updateExistingOrderStatus: (id: string, status: OrderStatus) => void;
   updateExistingOrder: (idOrOrder: string | Order, patch?: Partial<Order>) => void;
-  simulateIncomingOrder: () => Order;
   addNewOrder: (order: Order) => void;
   deleteOrder: (id: string) => void;
-  resetToDefaults: () => void;
 
   // Custom Paper Types actions
   addPaperType: (paper: Omit<PaperType, 'id'>) => void;
@@ -272,11 +278,17 @@ function playSoftNotificationChime() {
 export function CustomerOrderProvider({ children }: { children: ReactNode }) {
   const session = loadCustomerSession();
 
-  const initialDocs: DocumentInfo[] = session?.documents?.length
+  // Restored files must still be usable: a staged file only survives
+  // a reload if its bytes are already on the server (downloadUrl).
+  // Metadata-only ghosts (blob URL stripped on save, File gone) can
+  // neither preview nor print, so they are dropped instead of shown
+  // as files that do not work.
+  const initialDocs: DocumentInfo[] = (session?.documents?.length
     ? session.documents
     : session?.selectedDocument
     ? [session.selectedDocument]
-    : [];
+    : []
+  ).filter((d: DocumentInfo) => Boolean(d.downloadUrl));
 
   // Customer state initialized with persistent session fallback
   const [documents, setDocuments] = useState<DocumentInfo[]>(initialDocs);
@@ -298,7 +310,25 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
   const [pricingConfig, setPricingConfig] = useState<PricingConfig>(loadStoredPricing);
   const [shopConfig, setShopConfig] = useState<ShopConfig>(loadStoredShopConfig);
   const [printerStatus, setPrinterStatus] = useState<PrinterStatus>(loadStoredPrinter);
+  const [printers, setPrinters] = useState<PrinterStatus[]>([]);
   const [paperTypes, setPaperTypes] = useState<PaperType[]>(getSavedPaperTypes);
+
+  // Detect the real printers on the shop computer (OS-level).
+  // No printer is ever invented here: an empty list means none
+  // detected, and the UI says so honestly.
+  const refreshPrinters = useCallback(async () => {
+    try {
+      const res = await fetch('/api/printers');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data?.printers)) {
+        setPrinters(data.printers);
+        setPrinterStatus(data.printers[0] ?? unknownPrinter);
+      }
+    } catch {
+      // keep previous state; the UI shows what it knows
+    }
+  }, []);
 
   // Fetch real, original data from SQLite backend on mount
   useEffect(() => {
@@ -340,29 +370,34 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {});
 
-    // 4. Fetch real shop settings from SQLite database
+    // 4. Fetch real shop settings from SQLite database.
+    // Nullish merge (??): an empty string from the server is a real
+    // value and must clear any old placeholder, not fall back to it.
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
           setShopConfig((prev) => ({
             ...prev,
-            name: data.shop_name || prev.name,
-            phone: data.phone || prev.phone,
-            address: data.address || prev.address,
-            counterName: data.counter_name || prev.counterName,
-            bankName: data.bank_name || prev.bankName,
-            accountTitle: data.bank_title || prev.accountTitle,
-            iban: data.bank_iban || prev.iban,
-            jazzCashTitle: data.jazzcash_title || prev.jazzCashTitle,
-            jazzCashNumber: data.jazzcash_number || prev.jazzCashNumber,
-            easypaisaTitle: data.easypaisa_title || prev.easypaisaTitle,
-            easypaisaNumber: data.easypaisa_number || prev.easypaisaNumber,
+            name: data.shop_name ?? prev.name,
+            phone: data.phone ?? prev.phone,
+            address: data.address ?? prev.address,
+            counterName: data.counter_name ?? prev.counterName,
+            bankName: data.bank_name ?? prev.bankName,
+            accountTitle: data.bank_title ?? prev.accountTitle,
+            iban: data.bank_iban ?? prev.iban,
+            jazzCashTitle: data.jazzcash_title ?? prev.jazzCashTitle,
+            jazzCashNumber: data.jazzcash_number ?? prev.jazzCashNumber,
+            easypaisaTitle: data.easypaisa_title ?? prev.easypaisaTitle,
+            easypaisaNumber: data.easypaisa_number ?? prev.easypaisaNumber,
           }));
         }
       })
       .catch(() => {});
-  }, []);
+
+    // 5. Detect the real printers on this computer.
+    refreshPrinters();
+  }, [refreshPrinters]);
 
   // Dynamic live pricing recalculation across single or multiple documents
   useEffect(() => {
@@ -461,12 +496,25 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
                 return prev;
               }
               playSoftNotificationChime();
+              // Documents always come from the real payload. If it
+              // carries none, show a plain placeholder built from the
+              // order itself — never a sample file.
+              const fallbackDoc: DocumentInfo = {
+                id: 'doc_1',
+                fileName: 'Document',
+                fileSizeBytes: 0,
+                fileSize: '—',
+                fileType: 'application/pdf',
+                pageCount: Number(parsed.order.total_pages || 1),
+                thumbnailColor: 'bg-blue-500',
+                isImage: false,
+              };
               const incoming: Order = {
                 id: parsed.order.id,
                 token: parsed.order.token,
                 customerName: parsed.order.customer_name || parsed.order.customerName || 'Customer',
-                document: parsed.order.documents?.[0] || mockDocuments[0],
-                documents: parsed.order.documents || [mockDocuments[0]],
+                document: parsed.order.documents?.[0] || fallbackDoc,
+                documents: parsed.order.documents || [fallbackDoc],
                 settings: defaultSettings,
                 price: Number(parsed.order.total_price || 0),
                 status: parsed.order.status || 'queued',
@@ -548,18 +596,54 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const submitOrder = useCallback(
-    (nameOverride?: string): string => {
-      const token = generateToken();
+    async (nameOverride?: string): Promise<string> => {
+      const docs = documents.length > 0 ? documents : (selectedDocument ? [selectedDocument] : []);
+      // No documents, no order — the UI never calls this empty, but
+      // a blank order must never be created with a sample file.
+      if (docs.length === 0) return '';
+      // Token is one above the highest real token on record.
+      const token = nextToken(orders.map((o) => o.token));
       const finalName = nameOverride?.trim() || customerName.trim() || 'Walk-in Customer';
-      const docs = documents.length > 0 ? documents : (selectedDocument ? [selectedDocument] : [mockDocuments[0]]);
       const multi = calculateMultiDocumentPrice(docs, printSettings, pricingConfig, paperTypes);
+
+      // 1. Upload the real file bytes first. The shopkeeper's PC can
+      // only print what actually reaches the server — metadata alone
+      // (name, size, page count) is not a printable file.
+      const storedByKey = new Map<string, { storedFileName: string; downloadUrl: string }>();
+      const filesToUpload = docs.filter((d) => d.file instanceof File);
+      if (filesToUpload.length > 0) {
+        try {
+          const form = new FormData();
+          for (const d of filesToUpload) form.append('files', d.file as File);
+          const res = await fetch('/api/upload', { method: 'POST', body: form });
+          if (!res.ok) return '';
+          const data = await res.json();
+          for (const f of data.files || []) {
+            storedByKey.set(`${f.originalName}_${f.size}`, {
+              storedFileName: f.storedFileName,
+              downloadUrl: f.downloadUrl,
+            });
+          }
+        } catch {
+          return '';
+        }
+      }
+      // A file with neither bytes to upload nor a server copy already
+      // (e.g. staged, then the page reloaded) cannot be printed —
+      // refuse the order instead of handing out a token for it.
+      if (docs.some((d) => !(d.file instanceof File) && !d.downloadUrl)) return '';
+
+      const docsWithStorage = docs.map((d) => {
+        const stored = storedByKey.get(`${d.fileName}_${d.fileSizeBytes}`);
+        return stored ? { ...d, downloadUrl: stored.downloadUrl } : d;
+      });
 
       const newOrder: Order = {
         id: `ord-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         token,
         customerName: finalName,
-        document: docs[0],
-        documents: docs,
+        document: docsWithStorage[0],
+        documents: docsWithStorage,
         settings: { ...printSettings },
         price: multi.grandTotal,
         status: 'queued',
@@ -572,9 +656,13 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
       setOrderToken(token);
       setOrderStatus('queued');
 
-      // Asynchronously sync order to local SQLite backend
+      // 2. Persist the order — awaited. The shopkeeper's dashboard
+      // only sees the order through the server, so a silent failure
+      // here would hand the customer a token for an order that the
+      // shop never received. On failure the local order is rolled
+      // back and the caller shows an error instead of a token.
       try {
-        fetch('/api/orders', {
+        const res = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -586,25 +674,34 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
             totalCopies: printSettings.copies,
             paymentMethod,
             status: 'queued',
-            documents: docs.map((d) => ({
+            documents: docsWithStorage.map((d) => ({
               fileName: d.fileName,
               fileSizeBytes: d.fileSizeBytes,
               fileType: d.fileType,
               pageCount: d.pageCount,
+              storedFileName:
+                storedByKey.get(`${d.fileName}_${d.fileSizeBytes}`)?.storedFileName || null,
               colorMode: d.settings?.colorMode || printSettings.colorMode,
               sides: d.settings?.sides || printSettings.sides,
               paperSize: d.settings?.paperSize || printSettings.paperSize,
               copies: d.settings?.copies || printSettings.copies,
             })),
           }),
-        }).catch(() => {});
+        });
+        if (!res.ok) {
+          setOrders((prev) => prev.filter((o) => o.id !== newOrder.id));
+          setOrderToken('');
+          return '';
+        }
       } catch {
-        // safe fallback
+        setOrders((prev) => prev.filter((o) => o.id !== newOrder.id));
+        setOrderToken('');
+        return '';
       }
 
       return token;
     },
-    [customerName, documents, selectedDocument, printSettings, pricingConfig, paperTypes, paymentMethod]
+    [customerName, documents, selectedDocument, printSettings, pricingConfig, paperTypes, paymentMethod, orders]
   );
 
   const resetOrder = useCallback(() => {
@@ -683,41 +780,6 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
     setOrders((prev) => prev.filter((o) => o.id !== id));
   }, []);
 
-  const simulateIncomingOrder = useCallback((): Order => {
-    const randomDoc = mockDocuments[Math.floor(Math.random() * mockDocuments.length)];
-    const names = ['Hamza Tariq', 'Zubair Shah', 'Alina Faisal', 'Kamran Sheikh'];
-    const randomName = names[Math.floor(Math.random() * names.length)];
-    const token = generateToken();
-    const paper = paperTypes[Math.floor(Math.random() * paperTypes.length)] || paperTypes[0];
-
-    const randomSettings: PrintSettings = {
-      copies: Math.floor(Math.random() * 2) + 1,
-      colorMode: Math.random() > 0.6 ? 'color' : 'bw',
-      sides: Math.random() > 0.5 ? 'double' : 'single',
-      paperSize: paper.id,
-      pageRangeType: 'all',
-      pageRangeFrom: 1,
-      pageRangeTo: randomDoc.pageCount,
-    };
-
-    const breakdown = calculatePrice(randomSettings, randomDoc.pageCount, pricingConfig, paperTypes);
-    const newOrd: Order = {
-      id: `ord-${Date.now()}`,
-      token,
-      customerName: randomName,
-      document: randomDoc,
-      settings: randomSettings,
-      price: breakdown.total,
-      status: 'queued',
-      paymentMethod: 'cash',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setOrders((prev) => [newOrd, ...prev]);
-    return newOrd;
-  }, [pricingConfig, paperTypes]);
-
   // Paper Types CRUD
   const addPaperType = useCallback((paper: Omit<PaperType, 'id'>) => {
     const id = `paper_${Date.now()}`;
@@ -734,34 +796,29 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
     setPaperTypes((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const resetToDefaults = useCallback(() => {
-    setOrders([]);
-    setPricingConfig(defaultPricing);
-    setShopConfig(defaultShopConfig);
-    setPrinterStatus(defaultPrinter);
-    setPaperTypes(defaultPaperTypes);
-    localStorage.clear();
-  }, []);
-
-  // Compute daily stats
+  // Daily stats are computed from today's real orders only —
+  // "Today's Jobs" must never count yesterday's queue.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayOrders = orders.filter((o) => new Date(o.createdAt) >= startOfToday);
   const dailyStats: DailyStats = {
-    totalJobs: orders.length,
-    revenue: orders
+    totalJobs: todayOrders.length,
+    revenue: todayOrders
       .filter((o) => o.status !== 'cancelled')
       .reduce((sum, o) => sum + o.price, 0),
     averageOrder:
-      orders.length > 0
+      todayOrders.length > 0
         ? Math.round(
-            orders
+            todayOrders
               .filter((o) => o.status !== 'cancelled')
-              .reduce((sum, o) => sum + o.price, 0) / (orders.length || 1)
+              .reduce((sum, o) => sum + o.price, 0) / (todayOrders.length || 1)
           )
         : 0,
-    completed: orders.filter((o) => o.status === 'collected').length,
-    cancelled: orders.filter((o) => o.status === 'cancelled').length,
-    printing: orders.filter((o) => o.status === 'printing').length,
-    ready: orders.filter((o) => o.status === 'ready').length,
-    queued: orders.filter((o) => o.status === 'queued').length,
+    completed: todayOrders.filter((o) => o.status === 'collected').length,
+    cancelled: todayOrders.filter((o) => o.status === 'cancelled').length,
+    printing: todayOrders.filter((o) => o.status === 'printing').length,
+    ready: todayOrders.filter((o) => o.status === 'ready').length,
+    queued: todayOrders.filter((o) => o.status === 'queued').length,
   };
 
   const value: CustomerOrderContextValue = {
@@ -778,6 +835,8 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
     pricingConfig,
     shopConfig,
     printerStatus,
+    printers,
+    refreshPrinters,
     paperTypes,
     dailyStats,
     setDocument,
@@ -798,10 +857,8 @@ export function CustomerOrderProvider({ children }: { children: ReactNode }) {
     updatePrinterStatus,
     updateExistingOrderStatus,
     updateExistingOrder,
-    simulateIncomingOrder,
     addNewOrder,
     deleteOrder,
-    resetToDefaults,
     addPaperType,
     updatePaperType,
     deletePaperType,

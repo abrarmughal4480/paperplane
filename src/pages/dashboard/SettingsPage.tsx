@@ -14,7 +14,6 @@ import {
   QrCode,
   Copy,
   Check,
-  ExternalLink,
   Wifi,
 } from 'lucide-react';
 import { defaultShopConfig, type ShopConfig, getSavedShopConfig, saveShopConfig } from '../../data/mockData';
@@ -54,7 +53,8 @@ export default function SettingsPage() {
   };
 
   const handleCopyLink = () => {
-    const url = netInfo?.customerUrl || `http://${netInfo?.lanIp || '10.116.63.104'}:5000/customer/upload`;
+    const url = netInfo?.customerUrl;
+    if (!url) return;
     navigator.clipboard?.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -170,7 +170,7 @@ export default function SettingsPage() {
                 </label>
                 <div className="p-2.5 rounded-xl bg-card border border-border flex items-center justify-between gap-2">
                   <span className="font-mono font-bold text-primary text-xs break-all">
-                    {netInfo?.customerUrl || `http://${netInfo?.lanIp || '10.116.63.104'}:5000/customer/upload`}
+                    {netInfo?.customerUrl || 'Loading local address…'}
                   </span>
                   <button
                     type="button"
@@ -199,18 +199,8 @@ export default function SettingsPage() {
                   className="py-1.5 px-3 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <QrCode className="w-3.5 h-3.5 text-primary" />
-                  <span>Print Standee</span>
+                  <span>Print QR</span>
                 </button>
-
-                <a
-                  href={netInfo?.customerUrl || `http://${netInfo?.lanIp || '10.116.63.104'}:5000/customer/upload`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="py-1.5 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 flex items-center gap-1.5 shadow-xs"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Test Mobile Portal</span>
-                </a>
               </div>
             </div>
           </div>

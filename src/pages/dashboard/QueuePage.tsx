@@ -10,7 +10,7 @@ import {
   Filter,
   Check,
 } from 'lucide-react';
-import { mockOrders, type Order, type OrderStatus } from '../../data/mockData';
+import { type Order, type OrderStatus } from '../../data/mockData';
 import { useCustomerOrder } from '../../context/CustomerOrderContext';
 import { formatPrice } from '../../utils/pricing';
 import JobDetailModal from './JobDetailModal';
@@ -123,7 +123,7 @@ export default function QueuePage() {
         })}
       </div>
 
-      {/* High-Density POS Table */}
+      {/* Print Queue Table */}
       <Card className="overflow-hidden border-border/80 shadow-subtle">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">

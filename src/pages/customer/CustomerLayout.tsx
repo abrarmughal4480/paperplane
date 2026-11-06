@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShieldCheck, Printer } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { useCustomerOrder } from '../../context/CustomerOrderContext';
 
@@ -36,14 +36,6 @@ export function CustomerLayout() {
           {/* Right actions */}
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-primary/60 bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
-              title="Switch to POS Dashboard"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">POS</span> ↗
-            </Link>
           </div>
         </div>
       </header>

@@ -27,7 +27,7 @@ npm start
 ```
 
 Once started:
-- **Shopkeeper POS Dashboard**: `http://localhost:5000/dashboard`
+- **Shopkeeper Dashboard Dashboard**: `http://localhost:5000/dashboard`
 - **Customer Mobile Upload (Local Wi-Fi)**: `http://<YOUR_LAN_IP>:5000/customer/upload`
 
 ### 4. Development Mode
@@ -78,6 +78,19 @@ token screen aur rates me bhi update ho jati hain — dobara type nahi karna.
 - **Typography (self-hosted, offline-first — no Google Fonts CDN):** Poppins (600/700) for the "PaperPlane" wordmark, Inter (400–700) for all UI/body text. Font files live in `public/fonts/`, wired via `@font-face` in `src/styles/global.css`.
 - **Button contrast rule:** a button's background must never match the surface it sits on. `secondary` is now a clear light-blue tint (was near-white, invisible on white cards), `ghost` buttons have a real background + border, `subtle` is a 20% primary tint with a 60% border, and back buttons use the secondary tint + shadow. Verified by an automated contrast audit (light + dark mode) in `../testing/verify2.js` — 13/13 checks pass, including real previews of the owner's own HCI assignment PDF + DOCX.
 
+## 🧹 Production cleanup (6 Nov 2026, evening)
+- **No demo data anywhere:** all mock orders, customers, documents, daily/weekly stats, the fake HP/Canon printers (68%/72% levels) and the "Simulate order" generator are deleted. The dashboard starts empty and only shows real orders from SQLite. Tokens come from real orders (`A-1`, `A-2`, … — one above the highest existing token, so a restart never re-issues one).
+- **Real file upload:** submitting an order now uploads the actual file bytes to `POST /api/upload` first, and the order is only created after the server confirms it (the old code sent metadata only — the shop PC never received the file). The order create is awaited too: if the server is unreachable, no token is shown and the customer sees an error instead of a token for an order the shop never got.
+- **Real printers:** `GET /api/printers` detects printers from the OS (Windows `Get-Printer`, Linux/macOS `lpstat`). Nothing is invented — no printer detected means the UI says "No printer detected". Paper/toner levels are shown only if a printer actually reports them (none do here, so the UI says so instead of fake percentages).
+- **Files really are deleted after printing:** when an order is marked Collected (and auto-delete is on), the server shreds the uploaded files from disk and clears their stored names. Deleting an order does the same. This is what the footer promise means — it used to be a claim with no code behind it.
+- **QR print sheet:** the QR modal's "Print QR" button prints a clean sheet (logo, shop name, big QR, URL, 3 steps) and nothing else — print it once, paste it anywhere, customers scan from there. The old "Print Standee" printed the whole dashboard page.
+- **No cross-links between the two panels:** the customer pages never link to the dashboard and the dashboard never links to the customer pages (the POS button, "Test" link, "Launch Customer WebApp" and "Test Mobile Portal" are gone). The word "POS" is removed everywhere.
+- **No fake badges or demo controls:** "Verified" badges, "All Files Verified" and the Status page's "Demo Mode" status simulator are gone. Payment methods only appear when the shop has actually entered those account details — with empty defaults, only Cash is offered.
+- **De-duplicated text:** the file-deletion notice appears once (footer); "Ready in ~2 mins" is replaced by the live queue count; the hardcoded fallback IP `10.116.63.104` is gone (loading state instead).
+- **Preview:** the multi-file tab list has padding so the active tab's ring/shadow is never clipped on hover, and left/right arrows sit on the preview card itself to switch files.
+- **Build note:** do NOT convert the PDF/DOCX renderers to dynamic `import()` — `vite-plugin-javascript-obfuscator` mangles the specifier and Rollup then emits no chunk for them (verified: the build silently drops the worker and the preview 404s). Keep them statically imported.
+- **Verified by `../testing/verify3.js`: 36/36 checks pass** (empty dashboard, honest printer state, QR print sheet in print view, preview arrows switching files, real token flow, file upload + download, auto-delete on collect), 0 page errors.
+
 4. **Dynamic Tiered Pricing in PKR (`src/utils/pricing.ts`):**
    - B&W vs. Color page rates.
    - Single-sided vs. Double-sided discounts.
@@ -108,7 +121,7 @@ token screen aur rates me bhi update ho jati hain — dobara type nahi karna.
 │   ├── data/                # Data types and models
 │   ├── pages/
 │   │   ├── customer/        # Mobile-first QR customer portal
-│   │   └── dashboard/       # Desktop-optimized shopkeeper POS
+│   │   └── dashboard/       # Desktop-optimized shopkeeper dashboard
 │   ├── styles/              # Global Tailwind styles
 │   └── utils/               # PDF rendering, pricing, and security
 ├── package.json             # Dependencies and build scripts

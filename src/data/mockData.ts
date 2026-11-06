@@ -1,6 +1,9 @@
 // ============================================================
-// PaperPlane — Mock Data Layer
-// All data structures and mock data for the prototype
+// PaperPlane — Data Layer
+// Shared types and real shop defaults. No demo or sample data
+// lives here: orders, stats and printer state all come from the
+// live server. Defaults below are only the empty starting point
+// the shopkeeper fills in through Shop Settings.
 // ============================================================
 
 export type OrderStatus = 'queued' | 'printing' | 'ready' | 'collected' | 'cancelled';
@@ -103,9 +106,12 @@ export interface ShopConfig {
 export interface PrinterStatus {
   name: string;
   model: string;
-  status: 'online' | 'offline' | 'error';
-  paperLevel: number;
-  tonerLevel: number;
+  // 'unknown' = no printer detected on this computer yet.
+  status: 'online' | 'offline' | 'error' | 'unknown';
+  // Levels are null when the printer does not report them —
+  // the UI must show "not reported", never an invented number.
+  paperLevel: number | null;
+  tonerLevel: number | null;
   lastChecked: string;
 }
 
@@ -207,22 +213,24 @@ export const defaultPricing: PricingConfig = {
 
 export const defaultShopConfig: ShopConfig = {
   name: 'Al-Noor Photocopy & Printing',
-  address: 'Shop 12, University Road, Karachi',
-  phone: '+92 321 1234567',
+  address: '',
+  phone: '',
   openingHours: '8:00 AM — 10:00 PM',
   requireCustomerName: false,
   showEstimatedTime: true,
   showPaymentOptions: true,
   autoDeleteFiles: true,
   retentionPeriod: 'After printing',
-  // Real Pakistani Payment Details
-  accountTitle: 'Al-Noor Printing Services',
-  bankName: 'Meezan Bank Ltd',
-  iban: 'PK36MEZN0001234567890123',
-  jazzCashTitle: 'Muhammad Usman',
-  jazzCashNumber: '03211234567',
-  easypaisaTitle: 'Muhammad Usman',
-  easypaisaNumber: '03457654321',
+  // Payment details are empty until the shopkeeper enters the real
+  // ones in Shop Settings. Never ship with someone else's IBAN or
+  // mobile numbers as defaults.
+  accountTitle: '',
+  bankName: '',
+  iban: '',
+  jazzCashTitle: '',
+  jazzCashNumber: '',
+  easypaisaTitle: '',
+  easypaisaNumber: '',
 };
 
 export function getSavedShopConfig(): ShopConfig {
@@ -247,128 +255,24 @@ export function saveShopConfig(cfg: ShopConfig): void {
   }
 }
 
-export const defaultPrinter: PrinterStatus = {
-  name: 'Main Counter Printer',
-  model: 'HP LaserJet Pro MFP M428fdw',
-  status: 'online',
-  paperLevel: 68,
-  tonerLevel: 72,
-  lastChecked: '10 seconds ago',
+// Shown until the server reports a real detected printer.
+export const unknownPrinter: PrinterStatus = {
+  name: 'No printer detected',
+  model: '',
+  status: 'unknown',
+  paperLevel: null,
+  tonerLevel: null,
+  lastChecked: '',
 };
 
-export const offlinePrinter: PrinterStatus = {
-  name: 'Backup Printer',
-  model: 'Canon imageCLASS MF445dw',
-  status: 'offline',
-  paperLevel: 45,
-  tonerLevel: 30,
-  lastChecked: '2 minutes ago',
-};
-
-// ============================================================
-// Mock Documents
-// ============================================================
-
-export const mockDocuments: DocumentInfo[] = [
-  { fileName: 'Assignment.pdf', fileType: 'PDF', fileSize: '1.8 MB', fileSizeBytes: 1887436, pageCount: 8, thumbnailColor: '#E8E0F0' },
-  { fileName: 'Resume.pdf', fileType: 'PDF', fileSize: '420 KB', fileSizeBytes: 430080, pageCount: 3, thumbnailColor: '#E0E8F0' },
-  { fileName: 'CNIC_Copy.pdf', fileType: 'PDF', fileSize: '1.2 MB', fileSizeBytes: 1258291, pageCount: 2, thumbnailColor: '#F0E8E0' },
-  { fileName: 'Notes.pdf', fileType: 'PDF', fileSize: '3.4 MB', fileSizeBytes: 3565158, pageCount: 12, thumbnailColor: '#E0F0E8' },
-  { fileName: 'Application.docx', fileType: 'DOC', fileSize: '890 KB', fileSizeBytes: 911360, pageCount: 5, thumbnailColor: '#E8E8F0' },
-  { fileName: 'Document.jpg', fileType: 'JPG', fileSize: '2.1 MB', fileSizeBytes: 2202009, pageCount: 1, thumbnailColor: '#F0E0E8' },
-];
-
-export const mockCustomers = [
-  'Ahmed Khan',
-  'Sara Ali',
-  'Muhammad Usman',
-  'Hassan Raza',
-  'Ayesha Malik',
-  'Fatima Noor',
-  'Bilal Ahmed',
-  'Zainab Shah',
-];
-
-const now = new Date();
-const minutesAgo = (m: number) => new Date(now.getTime() - m * 60000);
-
-export const mockOrders: Order[] = [
-  {
-    id: '1', token: 'A-12', customerName: 'Ahmed Khan',
-    document: mockDocuments[0],
-    settings: { copies: 2, colorMode: 'bw', sides: 'double', paperSize: 'a4_70', pageRangeType: 'all', pageRangeFrom: 1, pageRangeTo: 8 },
-    price: 72, status: 'queued', paymentMethod: 'cash',
-    createdAt: minutesAgo(5), updatedAt: minutesAgo(5),
-  },
-  {
-    id: '2', token: 'A-13', customerName: 'Sara Ali',
-    document: mockDocuments[1],
-    settings: { copies: 1, colorMode: 'color', sides: 'single', paperSize: 'a4_80', pageRangeType: 'all', pageRangeFrom: 1, pageRangeTo: 3 },
-    price: 84, status: 'printing', paymentMethod: 'jazzcash',
-    createdAt: minutesAgo(12), updatedAt: minutesAgo(3),
-  },
-  {
-    id: '3', token: 'A-14', customerName: 'Muhammad Usman',
-    document: mockDocuments[3],
-    settings: { copies: 1, colorMode: 'bw', sides: 'single', paperSize: 'legal_75', pageRangeType: 'all', pageRangeFrom: 1, pageRangeTo: 12 },
-    price: 84, status: 'ready', paymentMethod: 'cash',
-    createdAt: minutesAgo(25), updatedAt: minutesAgo(8),
-  },
-  {
-    id: '4', token: 'A-15', customerName: 'Hassan Raza',
-    document: mockDocuments[2],
-    settings: { copies: 3, colorMode: 'bw', sides: 'single', paperSize: 'a4_70', pageRangeType: 'all', pageRangeFrom: 1, pageRangeTo: 2 },
-    price: 30, status: 'collected', paymentMethod: 'easypaisa',
-    createdAt: minutesAgo(45), updatedAt: minutesAgo(15),
-  },
-  {
-    id: '5', token: 'A-16', customerName: 'Ayesha Malik',
-    document: mockDocuments[4],
-    settings: { copies: 2, colorMode: 'color', sides: 'single', paperSize: 'a4_70', pageRangeType: 'custom', pageRangeFrom: 1, pageRangeTo: 3 },
-    price: 150, status: 'queued', paymentMethod: 'bank_transfer',
-    createdAt: minutesAgo(2), updatedAt: minutesAgo(2),
-  },
-  {
-    id: '6', token: 'A-17', customerName: 'Fatima Noor',
-    document: mockDocuments[5],
-    settings: { copies: 5, colorMode: 'bw', sides: 'single', paperSize: 'photo_glossy', pageRangeType: 'all', pageRangeFrom: 1, pageRangeTo: 1 },
-    price: 100, status: 'collected', paymentMethod: 'cash',
-    createdAt: minutesAgo(60), updatedAt: minutesAgo(30),
-  },
-];
-
-export const mockDailyStats: DailyStats = {
-  totalJobs: 42,
-  revenue: 6840,
-  averageOrder: 163,
-  completed: 29,
-  cancelled: 3,
-  printing: 5,
-  ready: 8,
-  queued: 4,
-};
-
-export const mockWeeklyData: WeeklyData[] = [
-  { day: 'Mon', revenue: 5200, jobs: 34 },
-  { day: 'Tue', revenue: 6100, jobs: 38 },
-  { day: 'Wed', revenue: 4800, jobs: 30 },
-  { day: 'Thu', revenue: 7200, jobs: 45 },
-  { day: 'Fri', revenue: 8500, jobs: 52 },
-  { day: 'Sat', revenue: 9200, jobs: 58 },
-  { day: 'Sun', revenue: 3400, jobs: 22 },
-];
-
-let tokenCounter = 20;
-
-export function generateToken(): string {
-  tokenCounter++;
-  return `A-${tokenCounter}`;
+// Token numbers come from real orders only: the next token is one
+// above the highest existing A-N token, so a server restart can
+// never re-issue a token that already exists.
+export function nextToken(existingTokens: string[]): string {
+  let max = 0;
+  for (const t of existingTokens) {
+    const m = /^A-(\d+)$/.exec(t.trim());
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `A-${max + 1}`;
 }
-
-export const statusBreakdown = [
-  { status: 'Queued' as const, count: 4, color: '#8E8E93' },
-  { status: 'Printing' as const, count: 5, color: '#0071E3' },
-  { status: 'Ready' as const, count: 8, color: '#34C759' },
-  { status: 'Collected' as const, count: 29, color: '#5856D6' },
-  { status: 'Cancelled' as const, count: 3, color: '#FF3B30' },
-];

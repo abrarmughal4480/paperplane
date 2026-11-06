@@ -74,6 +74,26 @@ export function TokenPage() {
 
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  // Only offer payment methods the shop has actually configured.
+  // Cash is always available; JazzCash / Easypaisa / bank transfer
+  // appear only once the shopkeeper has entered the real account
+  // details in Shop Settings.
+  const availableOptions = paymentOptions.filter((opt) => {
+    if (opt.value === 'cash') return true;
+    if (opt.value === 'jazzcash') return Boolean(shopConfig.jazzCashNumber?.trim());
+    if (opt.value === 'easypaisa') return Boolean(shopConfig.easypaisaNumber?.trim());
+    if (opt.value === 'bank_transfer') return Boolean(shopConfig.iban?.trim());
+    return false;
+  });
+
+  // If the selected method is no longer configured, fall back to cash.
+  useEffect(() => {
+    if (!availableOptions.some((opt) => opt.value === paymentMethod)) {
+      setPaymentMethod('cash');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopConfig.jazzCashNumber, shopConfig.easypaisaNumber, shopConfig.iban]);
+
   const currentDocs = documents.length > 0 ? documents : (selectedDocument ? [selectedDocument] : []);
 
   useEffect(() => {
@@ -174,7 +194,7 @@ export function TokenPage() {
         </div>
 
         <div className="space-y-2">
-          {paymentOptions.map((opt) => {
+          {availableOptions.map((opt) => {
             const isSelected = paymentMethod === opt.value;
             const Icon = opt.icon;
             return (
@@ -236,9 +256,6 @@ export function TokenPage() {
                     Shop Bank Account (Raast / IBAN)
                   </span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                  Verified
-                </span>
               </div>
 
               <div className="space-y-2 text-xs">

@@ -33,7 +33,7 @@ function App() {
             <Route path="status" element={<StatusPage />} />
           </Route>
 
-          {/* Dashboard Routes (Desktop-optimized Shopkeeper POS) */}
+          {/* Dashboard Routes (Desktop-optimized Shopkeeper Dashboard) */}
           <Route path="/dashboard/*" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
             <Route path="queue" element={<QueuePage />} />

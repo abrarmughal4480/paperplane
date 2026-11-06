@@ -8,6 +8,7 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
+import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { dbService, dbPath } from './db.js';
@@ -79,6 +80,76 @@ app.get('/api/network-info', async (_req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve network config', details: err.message });
   }
+});
+
+// 2b. Real printers on this computer (OS-level detection).
+// Returns what the operating system actually sees — never an
+// invented printer. Levels are null: consumer printers do not
+// report paper/toner levels through the OS.
+function detectPrinters() {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      execFile(
+        'powershell',
+        ['-NoProfile', '-Command', 'Get-Printer | Select-Object Name,DriverName,PrinterStatus | ConvertTo-Json'],
+        { timeout: 8000 },
+        (err, stdout) => {
+          if (err) return resolve([]);
+          try {
+            let list = JSON.parse(stdout);
+            if (!Array.isArray(list)) list = list ? [list] : [];
+            resolve(
+              list.map((p) => {
+                const st = String(p.PrinterStatus || '');
+                return {
+                  name: p.Name || 'Printer',
+                  model: p.DriverName || '',
+                  status: /offline/i.test(st)
+                    ? 'offline'
+                    : /error|paper|jam/i.test(st)
+                      ? 'error'
+                      : 'online',
+                  paperLevel: null,
+                  tonerLevel: null,
+                  lastChecked: new Date().toISOString(),
+                };
+              })
+            );
+          } catch {
+            resolve([]);
+          }
+        }
+      );
+    } else {
+      execFile('lpstat', ['-p'], { timeout: 8000 }, (err, stdout) => {
+        if (err) return resolve([]);
+        const printers = [];
+        for (const line of String(stdout).split('\n')) {
+          const m = /^printer (\S+)\s+(.*)$/.exec(line);
+          if (!m) continue;
+          const state = m[2] || '';
+          printers.push({
+            name: m[1],
+            model: '',
+            status: /disabled/i.test(state)
+              ? 'offline'
+              : /error/i.test(state)
+                ? 'error'
+                : 'online',
+            paperLevel: null,
+            tonerLevel: null,
+            lastChecked: new Date().toISOString(),
+          });
+        }
+        resolve(printers);
+      });
+    }
+  });
+}
+
+app.get('/api/printers', async (_req, res) => {
+  const printers = await detectPrinters();
+  res.json({ detected: printers.length > 0, printers });
 });
 
 // 3. Multi-file Document Upload
@@ -155,7 +226,7 @@ app.post('/api/orders', (req, res) => {
     const documents = body.documents || [];
     const newOrder = dbService.createOrder(orderData, documents);
 
-    // Broadcast instant real-time notification to shopkeeper desktop POS
+    // Broadcast instant real-time notification to shopkeeper desktop dashboard
     sseManager.broadcastNewOrder(newOrder);
 
     res.status(201).json(newOrder);
@@ -186,6 +257,21 @@ app.patch('/api/orders/:idOrToken/status', (req, res) => {
     const updated = dbService.updateOrderStatus(req.params.idOrToken, status, payment_status);
     if (!updated) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Collected = the customer has the pages. If auto-delete is on,
+    // the uploaded files are shredded now — this is what makes the
+    // "files are deleted after printing" promise true. It never
+    // fails the status update itself.
+    if (status === 'collected') {
+      try {
+        const settings = dbService.getShopSettings();
+        if (settings?.auto_delete_files !== 0) {
+          dbService.deleteOrderFiles(req.params.idOrToken);
+        }
+      } catch {
+        // cleanup failure must not break the status change
+      }
     }
 
     // Broadcast real-time status update to both shopkeeper and customer's phone
@@ -353,7 +439,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log('  PAPERPLANE — LOCAL PRODUCTION ENGINE RUNNING');
   console.log('  Al-Noor Photocopy & Printing, Pakistan');
   console.log('============================================================');
-  console.log(`  -> Shopkeeper POS Dashboard: ${net.dashboardUrl}`);
+  console.log(`  -> Shopkeeper Dashboard: ${net.dashboardUrl}`);
   console.log(`  -> Customer Mobile Upload:  ${net.customerUrl}`);
   console.log(`  -> Local IP:                ${net.lanIp}:${PORT}`);
   console.log(`  -> SQLite DB:               ${dbPath}`);
