@@ -6,3 +6,4 @@ data/*.sqlite-shm
 uploads/*
 !uploads/.gitkeep
 !data/.gitkeep
+tsconfig.tsbuildinfo
